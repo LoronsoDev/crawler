@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 func main() {
@@ -11,17 +12,40 @@ func main() {
 		fmt.Println("no website provided")
 		os.Exit(1)
 	}
+
+	maxConcurrency := 3
+	maxPages := 10
 	if len(argsWithoutProg) > 1 {
-		fmt.Println("too many arguments provided")
-		os.Exit(1)
+		conc, err := strconv.Atoi(argsWithoutProg[1])
+		if err != nil {
+			fmt.Printf("Error - configure: %v", err)
+			return
+		}
+		maxConcurrency = conc
 	}
-	url := argsWithoutProg[0]
-	fmt.Println("starting crawl of: " + url)
-	content, err := getHTML(url)
+	if len(argsWithoutProg) > 2 {
+		maxP, err := strconv.Atoi(argsWithoutProg[2])
+		if err != nil {
+			fmt.Printf("Error - configure: %v", err)
+			return
+		}
+		maxPages = maxP
+	}
+	rawBaseURL := argsWithoutProg[0]
+	fmt.Println("starting crawl of: " + rawBaseURL)
+	cfg, err := configure(rawBaseURL, maxConcurrency, maxPages)
 	if err != nil {
-		fmt.Println("error while fetching url: " + err.Error())
-		os.Exit(1)
+		fmt.Printf("Error - configure: %v", err)
+		return
 	}
-	fmt.Println(content)
+
+	fmt.Printf("starting crawl of: %s...\n", rawBaseURL)
+
+	cfg.wg.Add(1)
+	go cfg.crawlPage(rawBaseURL)
+	cfg.wg.Wait()
+
+	printReport(cfg.pages, rawBaseURL)
+
 	os.Exit(0)
 }
